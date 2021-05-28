@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# Docker configuration for Fabric TLS CA container
+
+version: '3'
+
+networks:
+  ecko:
+    external:
+      name: ecko-network
+    
+services:
+  tlsca.eckochain.example.com:
+    container_name: tlsca.eckochain.example.com
+    image: hyperledger/fabric-ca:1.5
+    environment:
+      - FABRIC_CA_SERVER_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=tlsca.eckochain.example.com
+      - FABRIC_CA_SERVER_CSR_CN=tlsca.eckochain.example.com
+      - FABRIC_CA_SERVER_CSR_HOSTS=tlsca.eckochain.example.com
+      - FABRIC_CA_SERVER_DEBUG=false
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+    command: sh -c 'fabric-ca-server start -d -b tlscaadmin:secret'
+    volumes:
+      - /eckostorage/fabric_data/crypto-config/tlsca.eckochain.example.com:/etc/hyperledger/fabric-ca-server
+    ports:
+      - 8054:7054
+    networks:
+      - ecko
+    logging:
+        driver: local

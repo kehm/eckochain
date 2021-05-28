@@ -1,0 +1,73 @@
+name: eckonetwork
+version: 1.0.0
+client:
+  organization: eckochain.example.com
+  connection:
+    timeout:
+      peer:
+        endorser: "300"
+      orderer: "300"
+channels:
+  eckochannel:
+    orderers:
+      - orderer0.eckochain.example.com
+      - orderer1.eckochain.example.com
+      - orderer2.eckochain.example.com
+    peers:
+      peer0.eckochain.example.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+        discover: true
+organizations:
+  eckochain.example.com:
+    mspid: eckochain.example.com-MSP
+    peers:
+      - peer0.eckochain.example.com
+      - peer1.eckochain.example.com
+    certificateAuthorities:
+      - ca.eckochain.example.com
+orderers:
+  orderer0.eckochain.example.com:
+    url: grpcs://orderer0.eckochain.example.com:7050
+    grpcOptions:
+      ssl-target-name-override: orderer0.eckochain.example.com
+    tlsCACerts:
+      path: /usr/data/config/certs/tlsca.eckochain.example.com-cert.crt
+  orderer1.eckochain.example.com:
+    url: grpcs://orderer1.eckochain.example.com:8050
+    grpcOptions:
+      ssl-target-name-override: orderer1.eckochain.example.com
+    tlsCACerts:
+      path: /usr/data/config/certs/tlsca.eckochain.example.com-cert.crt
+  orderer2.eckochain.example.com:
+    url: grpcs://orderer2.eckochain.example.com:9050
+    grpcOptions:
+      ssl-target-name-override: orderer2.eckochain.example.com
+    tlsCACerts:
+      path: /usr/data/config/certs/tlsca.eckochain.example.com-cert.crt
+peers:
+  peer0.eckochain.example.com:
+    url: grpcs://peer0.eckochain.example.com:7051
+    grpcOptions:
+      ssl-target-name-override: peer0.eckochain.example.com
+    tlsCACerts:
+      path: /usr/data/config/certs/tlsca.eckochain.example.com-cert.crt
+  peer1.eckochain.example.com:
+    url: grpcs://peer1.eckochain.example.com:7051
+    grpcOptions:
+      ssl-target-name-override: peer1.eckochain.example.com
+    tlsCACerts:
+      path: /usr/data/config/certs/tlsca.eckochain.example.com-cert.crt
+certificateAuthorities:
+  ca.eckochain.example.com:
+    url: https://ca.eckochain.example.com:7054
+    caName: ca.eckochain.example.com
+    httpOptions:
+      verify: false
+    tlsCACerts:
+      path: /usr/data/config/certs/tlsca.eckochain.example.com-cert.crt
+    registrar:
+      - enrollId: encaadmin
+        enrollSecret: secret

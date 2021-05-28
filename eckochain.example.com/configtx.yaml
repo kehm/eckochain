@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: Apache-2.0
+# Configuration file for the Configuration Transaction Generator (configtxgen) tool
+
+Organizations:
+    - &UIB
+        Name: eckochain.example.com-MSP
+        ID: eckochain.example.com-MSP
+        MSPDir: /eckostorage/fabric_data/crypto-config/msp.eckochain.example.com
+        OrdererEndpoints:
+            - "orderer0.eckochain.example.com:7050"
+            - "orderer1.eckochain.example.com:8050"
+            - "orderer2.eckochain.example.com:9050"
+        AnchorPeers:
+            - Host: peer0.eckochain.example.com
+              Port: 7051
+        Policies:
+            Readers:
+                Type: Signature
+                Rule: "OR('eckochain.example.com-MSP.admin', 'eckochain.example.com-MSP.peer', 'eckochain.example.com-MSP.client', 'eckochain.example.com-MSP.member')"
+            Writers:
+                Type: Signature
+                Rule: "OR('eckochain.example.com-MSP.admin', 'eckochain.example.com-MSP.client', 'eckochain.example.com-MSP.member')"
+            Admins:
+                Type: Signature
+                Rule: "OR('eckochain.example.com-MSP.admin', 'eckochain.example.com-MSP.member')"
+            Endorsement:
+                Type: Signature
+                Rule: "OR('eckochain.example.com-MSP.peer', 'eckochain.example.com-MSP.member')"
+
+Capabilities:
+    Channel: &ChannelCapabilities
+        V2_0: true
+    Orderer: &OrdererCapabilities
+        V2_0: true
+    Application: &ApplicationCapabilities
+        V2_0: true
+
+Application: &ApplicationDefaults
+    Organizations:
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Admins"
+        LifecycleEndorsement:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Endorsement"
+        Endorsement:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Endorsement"
+  
+Orderer: &OrdererDefaults
+    OrdererType: etcdraft
+    EtcdRaft:
+        Consenters:
+        - Host: orderer0.eckochain.example.com
+          Port: 7050
+          ClientTLSCert: /eckostorage/fabric_data/crypto-config/orderer0.eckochain.example.com/enca/tls/orderer0.eckochain.example.com-tlscert.crt
+          ServerTLSCert: /eckostorage/fabric_data/crypto-config/orderer0.eckochain.example.com/enca/tls/orderer0.eckochain.example.com-tlscert.crt
+        - Host: orderer1.eckochain.example.com
+          Port: 7050
+          ClientTLSCert: /eckostorage/fabric_data/crypto-config/orderer1.eckochain.example.com/enca/tls/orderer1.eckochain.example.com-tlscert.crt
+          ServerTLSCert: /eckostorage/fabric_data/crypto-config/orderer1.eckochain.example.com/enca/tls/orderer1.eckochain.example.com-tlscert.crt
+        - Host: orderer2.eckochain.example.com
+          Port: 7050
+          ClientTLSCert: /eckostorage/fabric_data/crypto-config/orderer2.eckochain.example.com/enca/tls/orderer2.eckochain.example.com-tlscert.crt
+          ServerTLSCert: /eckostorage/fabric_data/crypto-config/orderer2.eckochain.example.com/enca/tls/orderer2.eckochain.example.com-tlscert.crt
+    BatchTimeout: 2s
+    BatchSize:
+        MaxMessageCount: 1
+        AbsoluteMaxBytes: 99 MB
+        PreferredMaxBytes: 512 KB
+    Organizations:
+        - *UIB
+    Capabilities:
+        <<: *OrdererCapabilities
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Admins"
+        BlockValidation:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+
+Channel: &ChannelDefaults
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Admins"
+    Capabilities:
+        <<: *ChannelCapabilities
+
+Profiles:
+    InitialOrgsOrdererGenesis:
+        <<: *ChannelDefaults
+        Capabilities:
+            <<: *ChannelCapabilities
+        Orderer:
+            <<: *OrdererDefaults
+            Organizations:
+                - *UIB
+            Capabilities:
+                <<: *OrdererCapabilities
+        Application:
+            <<: *ApplicationDefaults
+            Organizations:
+                - *UIB
+            Capabilities:
+                <<: *ApplicationCapabilities

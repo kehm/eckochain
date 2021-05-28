@@ -1,0 +1,14 @@
+#Maven
+/chaincode/DatasetContract/target
+
+#VS Code
+.classpath
+.project
+.settings
+
+#IntelliJ
+.idea
+*.iml
+
+#Mac OS
+.DS_Store
