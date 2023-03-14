@@ -9,20 +9,20 @@ networks:
       name: ecko-network
     
 services:
-  tlsca.eckochain.example.com:
-    container_name: tlsca.eckochain.example.com
+  tlsca.orderers.eckochain.example.com:
+    container_name: tlsca.orderers.eckochain.example.com
     image: hyperledger/fabric-ca:1.5
     environment:
       - FABRIC_CA_SERVER_HOME=/etc/hyperledger/fabric-ca-server
-      - FABRIC_CA_SERVER_CA_NAME=tlsca.eckochain.example.com
+      - FABRIC_CA_SERVER_CA_NAME=tlsca.orderers.eckochain.example.com
       - FABRIC_CA_SERVER_DEBUG=false
       - FABRIC_CA_SERVER_TLS_ENABLED=true
     command: sh -c 'fabric-ca-server start -d'
     restart: unless-stopped
     volumes:
-      - /eckostorage/fabric_data/crypto-config/tlsca.eckochain.example.com:/etc/hyperledger/fabric-ca-server
+      - /eckostorage/fabric_data/crypto-config/tlsca.orderers.eckochain.example.com:/etc/hyperledger/fabric-ca-server
     ports:
-      - 8054:7054
+      - 10054:7054
     networks:
       - ecko
     logging:

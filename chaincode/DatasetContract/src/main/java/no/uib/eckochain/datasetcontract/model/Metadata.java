@@ -36,7 +36,7 @@ public class Metadata {
     private float[] spatialExtent;
     private Map<String, String> dynamicProperties;
     private Policy policy;
-    private Map<String, Contract> contracts;
+    private Map<String, DataContract> dataContracts;
     private DatasetStatus status;
     private FileInfo fileInfo;
     private String createdAt;
@@ -47,7 +47,7 @@ public class Metadata {
      * Constructor for Dataset object
      */
     public Metadata() {
-        this.contracts = new HashMap<>();
+        this.dataContracts = new HashMap<>();
         this.events = new ArrayList<>();
     }
 
@@ -520,21 +520,21 @@ public class Metadata {
     }
 
     /**
-     * Get contract hashes and status
+     * Get data contract hashes and status
      *
-     * @return Contract hashes and object
+     * @return Data contract hashes and object
      */
-    public Map<String, Contract> getContracts() {
-        return contracts;
+    public Map<String, DataContract> getDataContracts() {
+        return dataContracts;
     }
 
     /**
-     * Set contract hashes and status
+     * Set data contract hashes and status
      *
-     * @param contracts Contract hashes and object
+     * @param dataContracts Data contract hashes and object
      */
-    public void setContracts(Map<String, Contract> contracts) {
-        this.contracts = contracts;
+    public void setDataContracts(Map<String, DataContract> dataContracts) {
+        this.dataContracts = dataContracts;
     }
 
     /**

@@ -8,7 +8,7 @@ public class FileInfo {
 
     private String fileName;
     private String fileType;
-    private byte[] fileHash;
+    private String fileHash;
 
     /**
      * Constructor for Dataset object
@@ -68,7 +68,7 @@ public class FileInfo {
      *
      * @return File hash
      */
-    public byte[] getFileHash() {
+    public String getFileHash() {
         return fileHash;
     }
 
@@ -77,7 +77,7 @@ public class FileInfo {
      *
      * @param fileHash File hash
      */
-    public void setFileHash(byte[] fileHash) {
+    public void setFileHash(String fileHash) {
         this.fileHash = fileHash;
     }
 }

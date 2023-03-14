@@ -15,15 +15,14 @@ services:
     environment:
       - FABRIC_CA_SERVER_HOME=/etc/hyperledger/fabric-ca-server
       - FABRIC_CA_SERVER_CA_NAME=ca.eckochain.example.com
-      - FABRIC_CA_SERVER_CSR_CN=ca.eckochain.example.com
-      - FABRIC_CA_SERVER_CSR_HOSTS=ca.eckochain.example.com
       - FABRIC_CA_SERVER_DEBUG=false
       - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server/tls/ca.eckochain.example.com-tlscert.crt
       - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server/tls/ca.eckochain.example.com-priv.key
       - FABRIC_CA_SERVER_TLS_ENABLED=true
       - FABRIC_CA_SERVER_TLS_CLIENTAUTH_TYPE=VerifyClientCertIfGiven
       - FABRIC_CA_SERVER_TLS_CLIENTAUTH_CERTFILES=/etc/hyperledger/fabric-ca-server/msp/tlscacerts/tlsca.eckochain.example.com-cert.crt
-    command: sh -c 'fabric-ca-server start -d -b encaadmin:secret'
+    command: sh -c 'fabric-ca-server start -d'
+    restart: unless-stopped
     volumes:
       - /eckostorage/fabric_data/crypto-config/ca.eckochain.example.com/enca:/etc/hyperledger/fabric-ca-server
     ports:

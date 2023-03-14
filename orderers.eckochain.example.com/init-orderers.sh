@@ -3,7 +3,7 @@
 #Join orderers to channel
 
 export CHANNEL_NAME=eckochannel
-export ORG_NAME=eckochain.example.com
+export ORG_NAME=orderers.eckochain.example.com
 export VOLUME_PATH=/eckostorage/fabric_data
 export FABRIC_BIN_PATH=/home/ubuntu/bin
 cd .. && export FABRIC_CFG_PATH=$PWD && cd $ORG_NAME

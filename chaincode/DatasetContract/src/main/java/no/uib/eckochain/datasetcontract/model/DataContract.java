@@ -1,37 +1,32 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package main.java.no.uib.eckochain.datasetcontract.model;
 
-import java.util.ArrayList;
-
 /**
- * Class for contracts
+ * Class for data contracts
  */
-public class Contract {
+public class DataContract {
 
     private String detailsHash;
     private ContractStatus status;
     private String resolvedAt;
-    private ArrayList<Event> events;
 
     /**
-     * Constructor for Request object
+     * Constructor for DataContract object
      */
-    public Contract() {
-        this.events = new ArrayList<>();
+    public DataContract() {
     }
 
     /**
      * Constructor for Contract object
      *
      * @param detailsHash Contract details hash
-     * @param status Contract status
+     * @param status      Contract status
      * @param resolvedAt  Resolved at timestamp
      */
-    public Contract(String detailsHash, ContractStatus status, String resolvedAt) {
+    public DataContract(String detailsHash, ContractStatus status, String resolvedAt) {
         this.detailsHash = detailsHash;
         this.status = status;
         this.resolvedAt = resolvedAt;
-        this.events = new ArrayList<>();
     }
 
     /**
@@ -86,23 +81,5 @@ public class Contract {
      */
     public void setResolvedAt(String resolvedAt) {
         this.resolvedAt = resolvedAt;
-    }
-
-    /**
-     * Get events log
-     *
-     * @return Events log
-     */
-    public ArrayList<Event> getEvents() {
-        return events;
-    }
-
-    /**
-     * Set events lot
-     *
-     * @param events Events log
-     */
-    public void setEvents(ArrayList<Event> events) {
-        this.events = events;
     }
 }

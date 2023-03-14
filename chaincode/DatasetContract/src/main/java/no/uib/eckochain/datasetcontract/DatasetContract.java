@@ -1,25 +1,27 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package main.java.no.uib.eckochain.datasetcontract;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import main.java.no.uib.eckochain.datasetcontract.model.*;
 import main.java.no.uib.eckochain.datasetcontract.util.JSONParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import main.java.no.uib.eckochain.datasetcontract.util.SHA256Hasher;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.commons.codec.binary.Hex;
 import org.hyperledger.fabric.contract.ClientIdentity;
-import org.hyperledger.fabric.shim.ChaincodeBase;
+import org.hyperledger.fabric.contract.Context;
+import org.hyperledger.fabric.contract.ContractInterface;
+import org.hyperledger.fabric.contract.annotation.*;
+import org.hyperledger.fabric.contract.annotation.Contract;
+import org.hyperledger.fabric.contract.annotation.License;
 import org.hyperledger.fabric.shim.ChaincodeStub;
-import org.hyperledger.fabric.shim.ResponseUtils;
+import org.hyperledger.fabric.shim.ledger.CompositeKey;
 import org.hyperledger.fabric.shim.ledger.KeyValue;
 import org.hyperledger.fabric.shim.ledger.QueryResultsIterator;
 import org.json.JSONArray;
@@ -27,576 +29,513 @@ import org.json.JSONArray;
 /**
  * Class to handle DatasetContract chaincode invocations
  */
-public class DatasetContract extends ChaincodeBase {
+@Contract(name = "DatasetContract",
+        info = @Info(title = "Dataset Contract",
+                description = "Dataset Contract for ECKO - Ecological Consortium on Resurvey Data",
+                version = "0.0.1",
+                license =
+                @License(name = "SPDX-License-Identifier: Apache-2.0")))
+@Default
+public class DatasetContract implements ContractInterface {
 
-    private static final Log LOG = LogFactory.getLog(DatasetContract.class);
+    private static final Logger LOG = Logger.getLogger(DatasetContract.class.getName());
+    private static final String IMPLICIT_ORG = "_implicit_org_";
+    private static final String FILE_KEY = "file";
+    private static final String CONTRACT_KEY = "contract";
+    private static final String RIGHTS_KEY = "rights";
+    private static final String INVOKED_BY_KEY = "invokedBy";
+    private static final String CONTRACT_ID_KEY = "contractId";
 
-    @Override
-    public Response init(ChaincodeStub stub) {
-        try {
-            LOG.info("Initializing DatasetContract chaincode...");
-            String function = stub.getFunction();
-            if (!function.equals("init")) {
-                LOG.error("Function not implemented");
-                return ResponseUtils.newErrorResponse("Function not implemented");
-            }
-            List<String> args = stub.getParameters();
-            if (!args.isEmpty()) {
-                LOG.error("Expecting 0 arguments");
-                return ResponseUtils.newErrorResponse("Expecting 0 arguments");
-            }
-            LOG.error("Successfully initialized chaincode");
-            return ResponseUtils.newSuccessResponse("Initialize success");
-        } catch (Throwable ex) {
-            LOG.error(ex);
-            return ResponseUtils.newErrorResponse(ex);
-        }
-    }
-
-    @Override
-    public Response invoke(ChaincodeStub stub) {
-        try {
-            LOG.info("Invoking DatasetContract chaincode...");
-            switch (stub.getFunction()) {
-                case "putDatasetFile":
-                    if (stub.getParameters().size() != 1) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Putting dataset in private data...");
-                        return putDatasetFile(stub, stub.getParameters());
-                    }
-                case "putDatasetKey":
-                    if (stub.getParameters().size() != 1) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Putting key in private data...");
-                        return putDatasetKey(stub, stub.getParameters());
-                    }
-                case "removeDataset":
-                    if (stub.getParameters().size() != 1) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Removing dataset file and setting metadata status removed...");
-                        return removeDataset(stub, stub.getParameters());
-                    }
-                case "createMetadata":
-                    if (stub.getParameters().size() != 1) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Creating new metadata for dataset...");
-                        return createMetadata(stub, stub.getParameters());
-                    }
-                case "getDatasetFile":
-                    if (stub.getParameters().size() != 1) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Getting dataset file...");
-                        return getDatasetFile(stub, stub.getParameters());
-                    }
-                case "getDatasetKey":
-                    if (stub.getParameters().size() != 1) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Getting dataset key...");
-                        return getDatasetKey(stub, stub.getParameters());
-                    }
-                case "createContract":
-                    if (stub.getParameters().size() < 1 || stub.getParameters().size() > 2) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Creating new contract...");
-                        return createContract(stub, stub.getParameters());
-                    }
-                case "resolveContract":
-                    if (stub.getParameters().size() != 2) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Resolving contract...");
-                        return resolveContract(stub, stub.getParameters());
-                    }
-                case "queryPrivateData":
-                    if (stub.getParameters().size() != 1) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Querying private data...");
-                        return queryPrivateData(stub, stub.getParameters());
-                    }
-                case "query":
-                    if (stub.getParameters().size() != 1) {
-                        LOG.error("Invalid number of arguments");
-                        return ResponseUtils.newErrorResponse("Invalid number of arguments");
-                    } else {
-                        LOG.info("Querying state database...");
-                        return query(stub, stub.getParameters());
-                    }
-            }
-            return ResponseUtils.newErrorResponse("Chaincode function does not exist");
-        } catch (SecurityException ex) {
-            LOG.error(ex);
-            return ResponseUtils.newErrorResponse(ex);
-        } catch (JsonProcessingException ex) {
-            LOG.error("Could not parse JSON", ex);
-            return ResponseUtils.newErrorResponse("Could not parse JSON");
-        } catch (CertificateException | IOException ex) {
-            LOG.error("Could not get client identity", ex);
-            return ResponseUtils.newErrorResponse("Could not get client identity");
-        }
+    /**
+     * Constructor for DatasetContract
+     */
+    public DatasetContract() {
     }
 
     /**
-     * Put dataset file in private data (automatically creates a contract for the data owner)
+     * Submit a dataset to the organization's private data collection.
+     * Must target a peer from the invoker's organization.
      * Transient: invokedBy, file
      *
-     * @param stub Chaincode interface
-     * @param args Dataset ID
-     * @return Response
-     * @throws JsonProcessingException If cannot parse JSON
-     * @throws CertificateException    If cannot get client identity
-     * @throws IOException             If cannot get client identity
+     * @param ctx       Chaincode context
+     * @param datasetId Dataset ID
      */
-    private Response putDatasetFile(ChaincodeStub stub, List<String> args) throws JsonProcessingException, CertificateException, IOException {
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public void submitDataset(Context ctx, String datasetId) throws CertificateException, IOException {
+        ChaincodeStub stub = ctx.getStub();
         Map<String, byte[]> transientData = stub.getTransient();
-        if (transientData.isEmpty() || !transientData.containsKey("invokedBy") || !transientData.containsKey("file")) {
-            LOG.info("Required transient data is missing");
-            return ResponseUtils.newErrorResponse("Required transient data is missing");
+        if (transientData.isEmpty() || !transientData.containsKey(INVOKED_BY_KEY) || !transientData.containsKey(FILE_KEY)) {
+            LOG.info("Transient data is missing invokedBy or file");
+            throw new RuntimeException("Transient data is missing invokedBy or file");
         }
-        String datasetId = args.get(0);
-        Identity invoker = new Identity(new String(transientData.get("invokedBy"), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
-        if (!invoker.getMspId().equals(stub.getMspId())) {
-            LOG.info("Client organization does not match peer organization");
-            return ResponseUtils.newErrorResponse("Client organization does not match peer organization");
+        Identity invokedBy = new Identity(new String(transientData.get(INVOKED_BY_KEY), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
+        if (!isPeerFromFromOrganization(stub, invokedBy.getMspId())) {
+            LOG.info("Request must be submitted to a peer from the invoker's organization");
+            throw new RuntimeException(("Request must be submitted to a peer from the invoker's organization"));
         }
-        byte[] fileBytes = stub.getPrivateData("file_collection_" + stub.getMspId().replaceAll("\\.", "_"), "file:" + datasetId);
-        if (fileBytes != null && fileBytes.length > 0) {
-            LOG.info("A dataset with the supplied ID already exists in the private data collection");
-            return ResponseUtils.newErrorResponse("A contract with the supplied ID already exists in the private data collection");
-        }
+        // Check if metadata already exists
         String state = stub.getStringState(datasetId);
         if (state != null && !state.isEmpty()) {
             LOG.info("A dataset with the supplied ID already exists in the state database");
-            return ResponseUtils.newErrorResponse("A dataset with the supplied ID already exists in the state database");
+            throw new RuntimeException(("A dataset with the supplied ID already exists in the state database"));
         }
-        String contractId = SHA256Hasher.getHash(invoker.getId() + datasetId);
-        ContractDetails contractDetails = new ContractDetails(datasetId);
-        contractDetails.setCreatedAt(stub.getTxTimestamp().toString());
-        contractDetails.setCreatedBy(invoker.getId());
-        stub.putPrivateData("file_collection_" + stub.getMspId().replaceAll("\\.", "_"), "file:" + datasetId, transientData.get("file"));
-        stub.putPrivateData("_implicit_org_" + stub.getMspId(), "rights:" + datasetId, JSONParser.getJSON(invoker));
-        stub.putPrivateData("_implicit_org_" + stub.getMspId(), "contract:" + contractId, JSONParser.getJSON(contractDetails));
-        LOG.info("Successfully put dataset in private data");
-        return ResponseUtils.newSuccessResponse("Invoke success", datasetId.getBytes(StandardCharsets.UTF_8));
+        String implicitCollection = IMPLICIT_ORG + invokedBy.getMspId();
+        CompositeKey fileKey = stub.createCompositeKey(FILE_KEY, datasetId);
+        byte[] fileBytes = stub.getPrivateData(implicitCollection, fileKey.toString());
+        if (fileBytes != null && fileBytes.length > 0) {
+            LOG.info("A dataset with the supplied ID already exists in the private data collection");
+            throw new RuntimeException(("A contract with the supplied ID already exists in the private data collection"));
+        }
+        // Save file and rights holder in private data
+        CompositeKey rightsKey = stub.createCompositeKey(RIGHTS_KEY, datasetId);
+        LOG.info("Putting " + fileKey + " in collection " + implicitCollection);
+        LOG.info("Putting " + rightsKey + " in collection " + implicitCollection);
+        stub.putPrivateData(implicitCollection, fileKey.toString(), transientData.get(FILE_KEY));
+        stub.putPrivateData(implicitCollection, rightsKey.toString(), JSONParser.getJSON(invokedBy));
+        LOG.info("Successfully submitted dataset");
     }
 
     /**
-     * Put dataset key in private data
-     * Transient: invokedBy, key
-     *
-     * @param stub Chaincode interface
-     * @param args Dataset ID
-     * @return Response
-     * @throws JsonProcessingException If cannot parse JSON
-     * @throws CertificateException    If cannot get client identity
-     * @throws IOException             If cannot get client identity
-     */
-    private Response putDatasetKey(ChaincodeStub stub, List<String> args) throws JsonProcessingException, CertificateException, IOException {
-        Map<String, byte[]> transientData = stub.getTransient();
-        if (transientData.isEmpty() || !transientData.containsKey("invokedBy") || !transientData.containsKey("key")) {
-            LOG.info("Required transient data is missing");
-            return ResponseUtils.newErrorResponse("Required transient data is missing");
-        }
-        String datasetId = args.get(0);
-        Identity invoker = new Identity(new String(transientData.get("invokedBy"), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
-        if (!invoker.getMspId().equals(stub.getMspId())) {
-            LOG.info("Client organization does not match peer organization");
-            return ResponseUtils.newErrorResponse("Client organization does not match peer organization");
-        }
-        byte[] fileBytes = stub.getPrivateData("file_collection_" + stub.getMspId().replaceAll("\\.", "_"), "file:" + datasetId);
-        if (fileBytes == null || fileBytes.length == 0) {
-            LOG.info("Could not find dataset");
-            return ResponseUtils.newErrorResponse("Could not find dataset");
-        }
-        byte[] keyBytes = stub.getPrivateData("_implicit_org_" + stub.getMspId(), "key:" + datasetId);
-        if (keyBytes != null && keyBytes.length != 0) {
-            LOG.info("A key already exists in private data");
-            return ResponseUtils.newErrorResponse("A key already exists in private data");
-        }
-        stub.putPrivateData("_implicit_org_" + stub.getMspId(), "key:" + datasetId, transientData.get("key"));
-        LOG.info("Successfully put key in private data");
-        return ResponseUtils.newSuccessResponse("Invoke success", datasetId.getBytes(StandardCharsets.UTF_8));
-    }
-
-    /**
-     * Set metadata status removed and remove file and key
+     * Submit metadata for a new dataset that has been placed in the organization's private data collection.
      * Transient: invokedBy
      *
-     * @param stub Chaincode interface
-     * @param args Dataset ID
-     * @return Response
-     * @throws JsonProcessingException If cannot parse JSON
-     * @throws CertificateException    If cannot get client identity
-     * @throws IOException             If cannot get client identity
+     * @param ctx          Chaincode context
+     * @param metadataJson Metadata JSON
+     * @param policyJson   Policy JSON
+     * @param fileInfoJson FileInfo JSON
      */
-    private Response removeDataset(ChaincodeStub stub, List<String> args) throws JsonProcessingException, CertificateException, IOException {
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public void submitMetadata(Context ctx, String metadataJson, String policyJson, String fileInfoJson) throws CertificateException, IOException {
+        ChaincodeStub stub = ctx.getStub();
         Map<String, byte[]> transientData = stub.getTransient();
-        if (transientData.isEmpty() || !transientData.containsKey("invokedBy")) {
-            LOG.info("Required transient data is missing");
-            return ResponseUtils.newErrorResponse("Required transient data is missing");
+        if (transientData.isEmpty() || !transientData.containsKey(INVOKED_BY_KEY)) {
+            LOG.info("Transient data is missing invokedBy");
+            throw new RuntimeException("Transient data is missing invokedBy");
         }
-        String datasetId = args.get(0);
-        String state = stub.getStringState(datasetId);
-        if (state == null || state.isEmpty()) {
-            LOG.info("Could not find metadata for the dataset");
-            return ResponseUtils.newErrorResponse("Could not find metadata for the dataset");
-        }
-        Metadata metadata = JSONParser.getMetadata(state);
-        Identity invoker = new Identity(new String(transientData.get("invokedBy"), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
-        if (!metadata.getInstitutionId().equals(invoker.getMspId())) {
-            LOG.info("Peer organization does not match owner organization");
-            return ResponseUtils.newErrorResponse("Peer organization does not match owner organization");
-        }
-        if (stub.getMspId().equals(invoker.getMspId())) {
-            stub.delPrivateData("file_collection_" + stub.getMspId().replaceAll("\\.", "_"), "file:" + datasetId);
-            stub.delPrivateData("_implicit_org_" + stub.getMspId(), "key:" + datasetId);
-        }
+        // Parse parameters
+        Identity invokedBy = new Identity(new String(transientData.get(INVOKED_BY_KEY), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
         String timestamp = stub.getTxTimestamp().toString();
-        metadata.setStatus(DatasetStatus.REMOVED);
-        metadata.setFileInfo(null);
-        metadata.setModified(timestamp);
-        metadata.getEvents().add(new Event(EventType.REMOVE_FILE, timestamp));
-        stub.putStringState(metadata.getDatasetId(), JSONParser.getJSON(metadata));
-        return ResponseUtils.newSuccessResponse("Invoke success");
-    }
-
-    /**
-     * Create metadata for a dataset and accept data owner contract (overwrites existing metadata if it exists)
-     * Transient: invokedBy
-     *
-     * @param stub Chaincode interface
-     * @param args A JSON object with fields corresponding to Metadata, Policy and FileInfo objects
-     * @return Response
-     * @throws JsonProcessingException If cannot parse JSON
-     * @throws CertificateException    If cannot get client identity
-     * @throws IOException             If cannot get client identity
-     */
-    private Response createMetadata(ChaincodeStub stub, List<String> args) throws JsonProcessingException, CertificateException, IOException {
-        Map<String, byte[]> transientData = stub.getTransient();
-        if (transientData.isEmpty() || !transientData.containsKey("invokedBy")) {
-            LOG.info("Required transient data is missing");
-            return ResponseUtils.newErrorResponse("Required transient data is missing");
-        }
-        Identity invoker = new Identity(new String(transientData.get("invokedBy"), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
-        Metadata metadata = JSONParser.getMetadata(args.get(0));
-        Policy policy = JSONParser.getPolicy(args.get(0));
-        FileInfo fileInfo = JSONParser.getFileInfo(args.get(0));
-        String timestamp = stub.getTxTimestamp().toString();
-        metadata.setStatus(DatasetStatus.ACTIVE);
+        Metadata metadata = JSONParser.getMetadata(metadataJson);
         metadata.setCreatedAt(timestamp);
         metadata.setModified(timestamp);
-        metadata.setInstitutionId(invoker.getMspId());
+        metadata.setStatus(DatasetStatus.ACTIVE);
+        metadata.setInstitutionId(invokedBy.getMspId());
+        Policy policy = JSONParser.getPolicy(policyJson);
         policy.setCreatedAt(timestamp);
         metadata.setPolicy(policy);
-        byte[] fileHash = stub.getPrivateDataHash("file_collection_" + metadata.getInstitutionId().replaceAll("\\.", "_"), "file:" + metadata.getDatasetId());
-        if (fileHash == null || fileHash.length == 0) {
-            LOG.info("Could not find a dataset with matching ID");
-            return ResponseUtils.newErrorResponse("Could not find a dataset with matching ID");
-        }
-        byte[] keyHash = stub.getPrivateDataHash("_implicit_org_" + metadata.getInstitutionId(), "key:" + metadata.getDatasetId());
-        if (keyHash == null || keyHash.length == 0) {
-            LOG.info("Could not find a key with matching ID");
-            return ResponseUtils.newErrorResponse("Could not find a key with matching ID");
-        }
+        FileInfo fileInfo = JSONParser.getFileInfo(fileInfoJson);
+        // Check if metadata exists
         String state = stub.getStringState(metadata.getDatasetId());
         if (state != null && !state.isEmpty()) {
-            LOG.info("Metadata for this dataset already exist. Replacing existing metadata...");
-            Metadata existingMetadata = JSONParser.getMetadata(state);
-            metadata.setFileInfo(existingMetadata.getFileInfo());
-            metadata.setEvents(existingMetadata.getEvents());
-            metadata.getEvents().add(new Event(EventType.CHANGE_METADATA, timestamp));
-            if (!metadata.getPolicy().equals(existingMetadata.getPolicy())) {
-                metadata.getEvents().add(new Event(EventType.CHANGE_POLICY, timestamp));
-            }
-        } else {
-            fileInfo.setFileHash(fileHash);
-            metadata.setFileInfo(fileInfo);
+            LOG.info("A dataset with the supplied ID already exists in the state database");
+            throw new RuntimeException("A dataset with the supplied ID already exists in the state database");
         }
-        String contractId = SHA256Hasher.getHash(invoker.getId() + metadata.getDatasetId());
-        byte[] contractHash = stub.getPrivateDataHash("_implicit_org_" + metadata.getInstitutionId(), "contract:" + contractId);
-        if (contractHash == null || contractHash.length == 0) {
-            LOG.info("Could not find contract details for dataset owner");
-            return ResponseUtils.newErrorResponse("Could not find contract details for dataset owner");
+        String implicitCollection = IMPLICIT_ORG + invokedBy.getMspId();
+        CompositeKey fileKey = stub.createCompositeKey(FILE_KEY, metadata.getDatasetId());
+        byte[] fileHash = stub.getPrivateDataHash(implicitCollection, fileKey.toString());
+        if (fileHash == null || fileHash.length == 0) {
+            LOG.info("A dataset with the supplied ID does not exist in the private data collection");
+            throw new RuntimeException("A dataset with the supplied ID does not exist in the private data collection");
         }
-        String hashString = Base64.getEncoder().encodeToString(contractHash);
-        Event event = new Event(EventType.ACCEPT_CONTRACT, timestamp);
-        Contract contract = new Contract(hashString, ContractStatus.ACCEPTED, timestamp);
-        contract.getEvents().add(event);
-        metadata.getContracts().put(hashString, contract);
+        fileInfo.setFileHash(Hex.encodeHexString(fileHash));
+        metadata.setFileInfo(fileInfo);
+        if (!isRightsHolder(stub, invokedBy, metadata)) {
+            LOG.info("The invoker is not the owner of this dataset");
+            throw new RuntimeException("The invoker is not the owner of this dataset");
+        }
+        // Save metadata to state
         String metadataJSON = JSONParser.getJSON(metadata);
         stub.putStringState(metadata.getDatasetId(), metadataJSON);
-        LOG.info("Successfully created metadata for the dataset");
-        return ResponseUtils.newSuccessResponse("Invoke success");
+        LOG.info("Successfully submitted metadata");
     }
 
     /**
-     * Get dataset file if a valid contract is found
-     *
-     * @param stub Chaincode interface
-     * @param args Dataset ID
-     * @return Response
-     * @throws JsonProcessingException If cannot parse JSON
-     * @throws CertificateException    If cannot get client identity
-     * @throws IOException             If cannot get client identity
-     */
-    private Response getDatasetFile(ChaincodeStub stub, List<String> args) throws JsonProcessingException, CertificateException, IOException {
-        Map<String, byte[]> transientData = stub.getTransient();
-        if (transientData.isEmpty() || !transientData.containsKey("invokedBy")) {
-            LOG.info("Required transient data is missing");
-            return ResponseUtils.newErrorResponse("Required transient data is missing");
-        }
-        Identity invoker = new Identity(new String(transientData.get("invokedBy"), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
-        String state = stub.getStringState(args.get(0));
-        if (state == null || state.isEmpty()) {
-            LOG.info("Could not find metadata for the dataset");
-            return ResponseUtils.newErrorResponse("Could not find metadata for the dataset");
-        }
-        Metadata metadata = JSONParser.getMetadata(state);
-        byte[] fileHash = stub.getPrivateDataHash("file_collection_" + metadata.getInstitutionId().replaceAll("\\.", "_"), "file:" + metadata.getDatasetId());
-        byte[] fileBytes = stub.getPrivateData("file_collection_" + metadata.getInstitutionId().replaceAll("\\.", "_"), "file:" + metadata.getDatasetId());
-        if (fileBytes == null || fileHash == null || fileBytes.length == 0 || fileHash.length == 0) {
-            LOG.error("Could not find dataset file");
-            return ResponseUtils.newErrorResponse("Could not find dataset file");
-        }
-        if (!Arrays.equals(fileHash, metadata.getFileInfo().getFileHash())) {
-            LOG.error("File hash does not match registered hash");
-            return ResponseUtils.newErrorResponse("File hash does not match registered hash");
-        }
-        String contractId = SHA256Hasher.getHash(invoker.getId() + metadata.getDatasetId());
-        byte[] contractHash = stub.getPrivateDataHash("_implicit_org_" + metadata.getInstitutionId(), "contract:" + contractId);
-        if (contractHash == null || contractHash.length == 0) {
-            LOG.info("Could not find contract for user");
-            return ResponseUtils.newErrorResponse("Could not find contract for user");
-        }
-        Contract contract = metadata.getContracts().get(Base64.getEncoder().encodeToString(contractHash));
-        if (contract == null || !contract.getStatus().equals(ContractStatus.ACCEPTED)) {
-            LOG.info("Could not find an accepted contract");
-            return ResponseUtils.newErrorResponse("Could not find an accepted contract");
-        }
-        Event event = new Event(EventType.GET_FILE, stub.getTxTimestamp().toString());
-        contract.getEvents().add(event);
-        metadata.getEvents().add(event);
-        stub.putStringState(metadata.getDatasetId(), JSONParser.getJSON(metadata));
-        LOG.info("Successfully retrieved dataset file");
-        return ResponseUtils.newSuccessResponse("Invoke success", fileBytes);
-    }
-
-    /**
-     * Get dataset key (peer msp must equal dataset owner msp)
-     *
-     * @param stub Chaincode interface
-     * @param args Dataset ID
-     * @return Response
-     * @throws JsonProcessingException If cannot parse JSON
-     * @throws CertificateException    If cannot get client identity
-     * @throws IOException             If cannot get client identity
-     */
-    private Response getDatasetKey(ChaincodeStub stub, List<String> args) throws JsonProcessingException, CertificateException, IOException {
-        Map<String, byte[]> transientData = stub.getTransient();
-        if (transientData.isEmpty() || !transientData.containsKey("invokedBy")) {
-            LOG.info("Required transient data is missing");
-            return ResponseUtils.newErrorResponse("Required transient data is missing");
-        }
-        Identity invoker = new Identity(new String(transientData.get("invokedBy"), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
-        String state = stub.getStringState(args.get(0));
-        if (state == null || state.isEmpty()) {
-            LOG.info("Could not find metadata for the requested dataset");
-            return ResponseUtils.newErrorResponse("Could not find metadata for the requested dataset");
-        }
-        Metadata metadata = JSONParser.getMetadata(state);
-        if (!stub.getMspId().equals(metadata.getInstitutionId())) {
-            LOG.info("Peer organization does not match owner organization");
-            return ResponseUtils.newErrorResponse("Peer organization does not match owner organization");
-        }
-        byte[] keyBytes = stub.getPrivateData("_implicit_org_" + stub.getMspId(), "key:" + metadata.getDatasetId());
-        if (keyBytes == null || keyBytes.length == 0) {
-            LOG.error("Could not find dataset key");
-            return ResponseUtils.newErrorResponse("Could not find dataset key");
-        }
-        String contractId = SHA256Hasher.getHash(invoker.getId() + metadata.getDatasetId());
-        byte[] contractHash = stub.getPrivateDataHash("_implicit_org_" + metadata.getInstitutionId(), "contract:" + contractId);
-        if (contractHash == null || contractHash.length == 0) {
-            LOG.info("Could not find contract for user");
-            return ResponseUtils.newErrorResponse("Could not find contract for user");
-        }
-        Contract contract = metadata.getContracts().get(Base64.getEncoder().encodeToString(contractHash));
-        if (contract == null || !contract.getStatus().equals(ContractStatus.ACCEPTED)) {
-            LOG.info("Could not find an accepted contract");
-            return ResponseUtils.newErrorResponse("Could not find an accepted contract");
-        }
-        LOG.info("Successfully retrieved dataset key");
-        return ResponseUtils.newSuccessResponse("Invoke success", keyBytes);
-    }
-
-    /**
-     * Create a new contract for the dataset and place it in implicit collection of the invoker organization and the owner organization
+     * Update metadata for an existing dataset.
      * Transient: invokedBy
      *
-     * @param stub Chaincode interface
-     * @param args datasetId, proposal
-     * @return Response
-     * @throws JsonProcessingException If cannot parse JSON
-     * @throws CertificateException    If cannot get client identity
-     * @throws IOException             If cannot get client identity
+     * @param ctx          Chaincode context
+     * @param metadataJson Metadata JSON
+     * @param policyJson   Policy JSON
      */
-    private Response createContract(ChaincodeStub stub, List<String> args) throws JsonProcessingException, CertificateException, IOException {
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public void updateMetadata(Context ctx, String metadataJson, String policyJson) throws CertificateException, IOException {
+        ChaincodeStub stub = ctx.getStub();
         Map<String, byte[]> transientData = stub.getTransient();
-        if (transientData.isEmpty() || !transientData.containsKey("invokedBy")) {
-            LOG.info("Required transient data is missing");
-            return ResponseUtils.newErrorResponse("Required transient data is missing");
+        if (transientData.isEmpty() || !transientData.containsKey(INVOKED_BY_KEY)) {
+            LOG.info("Transient data is missing invokedBy");
+            throw new RuntimeException("Transient data is missing invokedBy");
         }
-        Identity invoker = new Identity(new String(transientData.get("invokedBy"), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
-        String state = stub.getStringState(args.get(0));
+        // Parse parameters
+        Metadata metadata = JSONParser.getMetadata(metadataJson);
+        Policy policy = JSONParser.getPolicy(policyJson);
+        metadata.setPolicy(policy);
+        String state = stub.getStringState(metadata.getDatasetId());
         if (state == null || state.isEmpty()) {
-            LOG.info("Could not find metadata for dataset");
-            return ResponseUtils.newErrorResponse("Could not find metadata for dataset");
+            LOG.info("A dataset with the supplied ID does not exist in the state database");
+            throw new RuntimeException("A dataset with the supplied ID does not exist in the state database");
         }
-        Metadata metadata = JSONParser.getMetadata(state);
-        if (!stub.getMspId().equals(invoker.getMspId()) || !stub.getMspId().equals(metadata.getInstitutionId())) {
-            LOG.info("Peer organization does not match client or owner organization");
-            return ResponseUtils.newErrorResponse("Peer organization does not match client or owner organization");
+        // Check institution
+        Metadata existingMetadata = JSONParser.getMetadata(state);
+        Identity invokedBy = new Identity(new String(transientData.get(INVOKED_BY_KEY), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
+        if (!isRightsHolder(stub, invokedBy, existingMetadata)) {
+            LOG.info("The invoker is not the owner of this dataset");
+            throw new RuntimeException("The invoker is not the owner of this dataset");
         }
-        String contractId = SHA256Hasher.getHash(invoker.getId() + metadata.getDatasetId());
-        Policy policy = metadata.getPolicy();
-        ContractDetails contractDetails;
-        if (policy.getTerms() != null) {
-            try {
-                contractDetails = new ContractDetails(args.get(0), args.get(1));
-            } catch (Exception e) {
-                LOG.info("Contract proposal cannot be empty when requesting a restricted dataset");
-                return ResponseUtils.newErrorResponse("Contract proposal cannot be empty when requesting a restricted dataset");
-            }
-        } else {
-            contractDetails = new ContractDetails(args.get(0));
+        if (existingMetadata.getStatus().equals(DatasetStatus.REMOVED)) {
+            LOG.info("The dataset has been removed");
+            throw new RuntimeException("The dataset has been removed");
         }
-        contractDetails.setPolicy(policy);
-        contractDetails.setCreatedAt(stub.getTxTimestamp().toString());
-        contractDetails.setCreatedBy(invoker.getId());
-        stub.putPrivateData("_implicit_org_" + stub.getMspId(), "contract:" + contractId, JSONParser.getJSON(contractDetails));
-        LOG.info("Successfully created contract");
-        return ResponseUtils.newSuccessResponse("Invoke success");
+        // Add existing file info, contracts and events to new object
+        String timestamp = stub.getTxTimestamp().toString();
+        metadata.setModified(timestamp);
+        metadata.setCreatedAt(existingMetadata.getCreatedAt());
+        metadata.setStatus(existingMetadata.getStatus());
+        metadata.setFileInfo(existingMetadata.getFileInfo());
+        metadata.setDataContracts(existingMetadata.getDataContracts());
+        metadata.setEvents(existingMetadata.getEvents());
+        metadata.getEvents().add(new Event(EventType.CHANGE_METADATA, timestamp));
+        if (!metadata.getPolicy().equals(existingMetadata.getPolicy())) {
+            metadata.getEvents().add(new Event(EventType.CHANGE_POLICY, timestamp));
+        }
+        // Save updated metadata to state
+        String metadataJSON = JSONParser.getJSON(metadata);
+        stub.putStringState(metadata.getDatasetId(), metadataJSON);
+        LOG.info("Successfully updated metadata");
     }
 
     /**
-     * Place the contract's private data hash in the metadata object on the blockchain, accompanied by the contract status
-     * Transient: invokedBy, contractId
+     * Remove the dataset from the organization's private data collection.
+     * Must target a peer from the invoker's organization.
+     * Transient: invokedBy
      *
-     * @param stub Chaincode interface
-     * @param args datasetId, boolean approve/reject
-     * @return Response
-     * @throws JsonProcessingException If cannot parse JSON
-     * @throws CertificateException    If cannot get client identity
-     * @throws IOException             If cannot get client identity
+     * @param ctx       Chaincode context
+     * @param datasetId Dataset ID
      */
-    private Response resolveContract(ChaincodeStub stub, List<String> args) throws JsonProcessingException, CertificateException, IOException {
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public void removeDataset(Context ctx, String datasetId) throws CertificateException, IOException {
+        ChaincodeStub stub = ctx.getStub();
         Map<String, byte[]> transientData = stub.getTransient();
-        if (transientData.isEmpty() || !transientData.containsKey("invokedBy") || !transientData.containsKey("contractId")) {
-            LOG.info("Required transient data is missing");
-            return ResponseUtils.newErrorResponse("Required transient data is missing");
+        if (transientData.isEmpty() || !transientData.containsKey(INVOKED_BY_KEY)) {
+            LOG.info("Transient data is missing invokedBy");
+            throw new RuntimeException("Transient data is missing invokedBy");
         }
-        Identity invoker = new Identity(new String(transientData.get("invokedBy"), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
-        String state = stub.getStringState(args.get(0));
+        // Parse parameters
+        String state = stub.getStringState(datasetId);
         if (state == null || state.isEmpty()) {
-            LOG.info("Could not find metadata for dataset");
-            return ResponseUtils.newErrorResponse("Could not find metadata for dataset");
+            LOG.info("A dataset with the supplied ID does not exist in the state database");
+            throw new RuntimeException("A dataset with the supplied ID does not exist in the state database");
         }
         Metadata metadata = JSONParser.getMetadata(state);
-        String contractId = new String(transientData.get("contractId"), StandardCharsets.UTF_8);
-        byte[] contractHash = stub.getPrivateDataHash("_implicit_org_" + metadata.getInstitutionId(), "contract:" + contractId);
-        if (contractHash == null || contractHash.length == 0) {
-            LOG.info("Could not find contract details");
-            return ResponseUtils.newErrorResponse("Could not find contract details");
+        // Check institution
+        Identity invokedBy = new Identity(new String(transientData.get(INVOKED_BY_KEY), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
+        if (!isRightsHolder(stub, invokedBy, metadata)) {
+            LOG.info("The invoker is not the owner of this dataset");
+            throw new RuntimeException("The invoker is not the owner of this dataset");
         }
-        if (metadata.getPolicy().getTerms() != null && !invoker.getMspId().equals(metadata.getInstitutionId())) {
-            LOG.info("The client msp does not match the dataset owner's msp");
-            return ResponseUtils.newErrorResponse("The client msp does not match the dataset owner's msp");
+        // Remove file from private data
+        String implicitCollection = IMPLICIT_ORG + invokedBy.getMspId();
+        CompositeKey fileKey = stub.createCompositeKey(FILE_KEY, datasetId);
+        stub.delPrivateData(implicitCollection, fileKey.toString());
+        LOG.info("Successfully removed dataset");
+    }
+
+    /**
+     * Set dataset status to removed.
+     * Transient: invokedBy
+     *
+     * @param ctx       Chaincode context
+     * @param datasetId Dataset ID
+     */
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public void setDatasetRemoved(Context ctx, String datasetId) throws CertificateException, IOException {
+        ChaincodeStub stub = ctx.getStub();
+        Map<String, byte[]> transientData = stub.getTransient();
+        if (transientData.isEmpty() || !transientData.containsKey(INVOKED_BY_KEY)) {
+            LOG.info("Transient data is missing invokedBy");
+            throw new RuntimeException("Transient data is missing invokedBy");
         }
-        String hashString = Base64.getEncoder().encodeToString(contractHash);
-        if (metadata.getContracts().get(hashString) != null) {
-            LOG.info("The contract has already been resolved");
-            return ResponseUtils.newErrorResponse("The contract has already been resolved");
+        // Parse parameters
+        String state = stub.getStringState(datasetId);
+        if (state == null || state.isEmpty()) {
+            LOG.info("A dataset with the supplied ID does not exist in the state database");
+            throw new RuntimeException("A dataset with the supplied ID does not exist in the state database");
         }
-        ContractStatus contractStatus = ContractStatus.REJECTED;
-        EventType eventType = EventType.REJECT_CONTRACT;
-        if (Boolean.parseBoolean(args.get(1))) {
-            contractStatus = ContractStatus.ACCEPTED;
-            eventType = EventType.ACCEPT_CONTRACT;
+        Metadata metadata = JSONParser.getMetadata(state);
+        // Check institution
+        Identity invokedBy = new Identity(new String(transientData.get(INVOKED_BY_KEY), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
+        if (!isRightsHolder(stub, invokedBy, metadata)) {
+            LOG.info("The invoker is not the owner of this dataset");
+            throw new RuntimeException("The invoker is not the owner of this dataset");
         }
+        // Check if dataset is removed
+        String implicitCollection = IMPLICIT_ORG + invokedBy.getMspId();
+        CompositeKey fileKey = stub.createCompositeKey(FILE_KEY, datasetId);
+        byte[] fileHash = stub.getPrivateDataHash(implicitCollection, fileKey.toString());
+        if (fileHash != null && fileHash.length > 0) {
+            LOG.info("A dataset with the supplied ID still exists in the private data collection");
+            throw new RuntimeException("A contract with the supplied ID still exists in the private data collection");
+        }
+        // Save updated metadata to state
         String timestamp = stub.getTxTimestamp().toString();
-        Event event = new Event(eventType, timestamp);
-        Contract contract = new Contract(hashString, contractStatus, timestamp);
-        contract.getEvents().add(event);
-        metadata.getContracts().put(hashString, contract);
+        metadata.setModified(timestamp);
+        metadata.setStatus(DatasetStatus.REMOVED);
+        metadata.setFileInfo(null);
+        metadata.getEvents().add(new Event(EventType.REMOVE_FILE, timestamp));
+        stub.putStringState(metadata.getDatasetId(), JSONParser.getJSON(metadata));
+        LOG.info("Successfully updated metadata with status removed");
+    }
+
+    /**
+     * Create a new contract for the dataset and place it in implicit collection of the requester and owner organizations.
+     * Transient: invokedBy
+     *
+     * @param ctx       Chaincode context
+     * @param datasetId Dataset ID
+     * @param proposal  Proposal message (ignored if no terms)
+     */
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public void createContract(Context ctx, String datasetId, String proposal) throws CertificateException, IOException {
+        ChaincodeStub stub = ctx.getStub();
+        Map<String, byte[]> transientData = stub.getTransient();
+        if (transientData.isEmpty() || !transientData.containsKey(INVOKED_BY_KEY)) {
+            LOG.info("Transient data is missing invokedBy");
+            throw new RuntimeException("Transient data is missing invokedBy");
+        }
+        // Check state
+        String state = stub.getStringState(datasetId);
+        if (state == null || state.isEmpty()) {
+            LOG.info("A dataset with the supplied ID does not exist in the state database");
+            throw new RuntimeException("A dataset with the supplied ID does not exist in the state database");
+        }
+        Metadata metadata = JSONParser.getMetadata(state);
+        Identity invokedBy = new Identity(new String(transientData.get(INVOKED_BY_KEY), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
+        if (!isPeerFromFromOrganization(stub, invokedBy.getMspId())) {
+            LOG.info("Request must be submitted to a peer from the invoker's organization");
+            throw new RuntimeException("Request must be submitted to a peer from the invoker's organization");
+        }
+        // Check contract
+        String contractId = SHA256Hasher.getHash(invokedBy.getId() + metadata.getDatasetId());
+        CompositeKey contractKey = stub.createCompositeKey(CONTRACT_KEY, contractId);
+        String requesterImplicitCollection = IMPLICIT_ORG + invokedBy.getMspId();
+        String ownerImplicitCollection = IMPLICIT_ORG + metadata.getInstitutionId();
+        byte[] requesterContractHash = stub.getPrivateDataHash(requesterImplicitCollection, contractKey.toString());
+        byte[] ownerContractHash = stub.getPrivateDataHash(ownerImplicitCollection, contractKey.toString());
+        if ((requesterContractHash != null && requesterContractHash.length > 0) || ownerContractHash != null && ownerContractHash.length > 0) {
+            LOG.info("User already has a contract for this dataset");
+            throw new RuntimeException("User already has a contract for this dataset");
+        }
+        // Set proposal
+        Policy policy = metadata.getPolicy();
+        ContractDetails contractDetails = new ContractDetails(datasetId);
+        if (policy.getTerms() != null) {
+            contractDetails.setProposal(proposal);
+        }
+        // Save contract details in requester and owner organisations' private data
+        String timestamp = stub.getTxTimestamp().toString();
+        contractDetails.setCreatedAt(timestamp);
+        contractDetails.setCreatedBy(invokedBy.getId());
+        contractDetails.setPolicy(policy);
+        // If peer is from the requester's organization
+        if (isPeerFromFromOrganization(stub, invokedBy.getMspId())) {
+            LOG.info("Putting " + contractKey + " in collection " + requesterImplicitCollection);
+            stub.putPrivateData(requesterImplicitCollection, contractKey.toString(), JSONParser.getJSON(contractDetails));
+        }
+        // If peer is from the owner's organization
+        if (isPeerFromFromOrganization(stub, metadata.getInstitutionId())) {
+            LOG.info("Putting " + contractKey + " in collection " + ownerImplicitCollection);
+            stub.putPrivateData(ownerImplicitCollection, contractKey.toString(), JSONParser.getJSON(contractDetails));
+        }
+        LOG.info("Successfully created contract");
+    }
+
+    /**
+     * Place the contract's private data hash and status in the dataset's metadata object.
+     * Must be invoked by the dataset owner if the dataset has custom terms, else the requester can invoke.
+     * Transient: invokedBy, contractId
+     *
+     * @param ctx       Chaincode context
+     * @param datasetId Dataset ID
+     * @param approve   Boolean approve/reject
+     */
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public void resolveContract(Context ctx, String datasetId, String approve) throws CertificateException, IOException {
+        ChaincodeStub stub = ctx.getStub();
+        Map<String, byte[]> transientData = stub.getTransient();
+        if (transientData.isEmpty() || !transientData.containsKey(INVOKED_BY_KEY) || !transientData.containsKey(CONTRACT_ID_KEY)) {
+            LOG.info("Transient data is missing invokedBy or contractId");
+            throw new RuntimeException("Transient data is missing invokedBy or contractId");
+        }
+        // Check state
+        String state = stub.getStringState(datasetId);
+        if (state == null || state.isEmpty()) {
+            LOG.info("A dataset with the supplied ID does not exist in the state database");
+            throw new RuntimeException("A dataset with the supplied ID does not exist in the state database");
+        }
+        Metadata metadata = JSONParser.getMetadata(state);
+        // Check if the policy is a license or custom terms
+        Policy policy = metadata.getPolicy();
+        Identity invokedBy = new Identity(new String(transientData.get(INVOKED_BY_KEY), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
+        String contractId = SHA256Hasher.getHash(invokedBy.getId() + metadata.getDatasetId());
+        if (policy.getTerms() != null && !isRightsHolder(stub, invokedBy, metadata)) {
+            LOG.info("The invoker is not the owner of this dataset");
+            throw new RuntimeException("The invoker is not the owner of this dataset");
+        } else if (!contractId.equals(new String(transientData.get(CONTRACT_ID_KEY), StandardCharsets.UTF_8))) {
+            LOG.info("The invoker is not the contract requester");
+            throw new RuntimeException("The invoker is not the contract requester");
+        }
+        // Check contract
+        String requesterImplicitCollection = IMPLICIT_ORG + invokedBy.getMspId();
+        String ownerImplicitCollection = IMPLICIT_ORG + metadata.getInstitutionId();
+        CompositeKey contractKey = stub.createCompositeKey(CONTRACT_KEY, contractId);
+        byte[] requesterContractHash = stub.getPrivateDataHash(requesterImplicitCollection, contractKey.toString());
+        byte[] ownerContractHash = stub.getPrivateDataHash(ownerImplicitCollection, contractKey.toString());
+        if ((requesterContractHash == null || requesterContractHash.length == 0) || (ownerContractHash == null || ownerContractHash.length == 0)) {
+            LOG.info("Contract does not exist");
+            throw new RuntimeException("Contract does not exist");
+        }
+        if (!Arrays.equals(requesterContractHash, ownerContractHash)) {
+            LOG.info("Contract is invalid");
+            throw new RuntimeException("Contract is invalid");
+        }
+
+        String contractHash = Hex.encodeHexString(ownerContractHash);
+        if (metadata.getDataContracts().get(contractHash) != null) {
+            LOG.info("The contract has already been resolved");
+            throw new RuntimeException("The contract has already been resolved");
+        }
+        // Set contract status
+        Event event;
+        DataContract dataContract;
+        String timestamp = stub.getTxTimestamp().toString();
+        if (Boolean.parseBoolean(approve)) {
+            event = new Event(EventType.ACCEPT_CONTRACT, timestamp);
+            dataContract = new DataContract(contractHash, ContractStatus.ACCEPTED, timestamp);
+        } else {
+            event = new Event(EventType.REJECT_CONTRACT, timestamp);
+            dataContract = new DataContract(contractHash, ContractStatus.REJECTED, timestamp);
+        }
+        metadata.getDataContracts().put(contractHash, dataContract);
         metadata.getEvents().add(event);
         stub.putStringState(metadata.getDatasetId(), JSONParser.getJSON(metadata));
         LOG.info("Successfully resolved contract");
-        return ResponseUtils.newSuccessResponse("Invoke success");
     }
 
     /**
-     * Query private data
+     * Get dataset file. Must be targeted to a peer from the organization that owns the dataset.
+     * Requires that the invoker has an accepted contract for the dataset.
      *
-     * @param stub Chaincode interface
-     * @param args CouchDB query string
-     * @return Response and payload (byte array of string)
-     * @throws CertificateException If cannot get client identity
-     * @throws IOException          If cannot get client identity
+     * @param ctx       Chaincode context
+     * @param datasetId Dataset ID
+     * @return File bytes
      */
-    private Response queryPrivateData(ChaincodeStub stub, List<String> args) throws CertificateException, IOException {
-        String clientMspId = new ClientIdentity(stub).getMSPID();
-        if (!clientMspId.equals(stub.getMspId())) {
-            LOG.info("Client organization does not match peer organization");
-            return ResponseUtils.newErrorResponse("Client organization does not match peer organization");
+    @Transaction(intent = Transaction.TYPE.EVALUATE)
+    public byte[] getDataset(Context ctx, String datasetId) throws CertificateException, IOException {
+        ChaincodeStub stub = ctx.getStub();
+        Map<String, byte[]> transientData = stub.getTransient();
+        if (transientData.isEmpty() || !transientData.containsKey(INVOKED_BY_KEY)) {
+            LOG.info("Transient data is missing invokedBy");
+            throw new RuntimeException("Transient data is missing invokedBy");
         }
+        // Check state
+        String state = stub.getStringState(datasetId);
+        if (state == null || state.isEmpty()) {
+            LOG.info("A dataset with the supplied ID does not exist in the state database");
+            throw new RuntimeException("A dataset with the supplied ID does not exist in the state database");
+        }
+        Metadata metadata = JSONParser.getMetadata(state);
+        if (!isPeerFromFromOrganization(stub, metadata.getInstitutionId())) {
+            LOG.info("Dataset must be submitted to a peer from the dataset owner's organization");
+            throw new RuntimeException("Dataset must be submitted to a peer from the dataset owner's organization");
+        }
+        // Get dataset file from private data
+        CompositeKey fileKey = stub.createCompositeKey(FILE_KEY, metadata.getDatasetId());
+        byte[] fileBytes = stub.getPrivateData(IMPLICIT_ORG + metadata.getInstitutionId(), fileKey.toString());
+        if (fileBytes == null || fileBytes.length == 0) {
+            LOG.info("Could not find dataset file");
+            throw new RuntimeException("Could not find dataset file");
+        }
+        // Check contract
+        Identity invokedBy = new Identity(new String(transientData.get(INVOKED_BY_KEY), StandardCharsets.UTF_8), new ClientIdentity(stub).getMSPID());
+        if (!isRightsHolder(stub, invokedBy, metadata)) {
+            String contractId = SHA256Hasher.getHash(invokedBy.getId() + metadata.getDatasetId());
+            String implicitCollection = IMPLICIT_ORG + metadata.getInstitutionId();
+            CompositeKey contractKey = stub.createCompositeKey(CONTRACT_KEY, contractId);
+            byte[] contractHash = stub.getPrivateDataHash(implicitCollection, contractKey.toString());
+            if (contractHash == null || contractHash.length == 0) {
+                LOG.info("User does not have a contract for this dataset");
+                throw new RuntimeException("User does not have a contract for this dataset");
+            }
+            DataContract dataContract = metadata.getDataContracts().get(Hex.encodeHexString(contractHash));
+            if (dataContract == null || !dataContract.getStatus().equals(ContractStatus.ACCEPTED)) {
+                LOG.info("User does not have an accepted contract for this dataset");
+                throw new RuntimeException("User does not have an accepted contract for this dataset");
+            }
+        }
+        LOG.info("Successfully retrieved dataset");
+        return fileBytes;
+    }
+
+    /**
+     * Get metadata for all or a specified dataset.
+     *
+     * @param ctx       Chaincode context
+     * @param datasetId A dataset ID or 'null' to get all
+     * @return Stringified array of metadata
+     */
+    @Transaction(intent = Transaction.TYPE.EVALUATE)
+    public String getMetadata(Context ctx, String datasetId) throws Exception {
+        ChaincodeStub stub = ctx.getStub();
         JSONArray jsonArray = new JSONArray();
-        QueryResultsIterator<KeyValue> rows = stub.getPrivateDataQueryResult("_implicit_org_" + clientMspId, args.get(0));
-        while (rows.iterator().hasNext()) {
-            jsonArray.put(rows.iterator().next().getStringValue());
+        if (datasetId.equals("null")) {
+            try (QueryResultsIterator<KeyValue> iterator = stub.getStateByRange("", "")) {
+                while (iterator.iterator().hasNext()) {
+                    jsonArray.put(iterator.iterator().next().getStringValue());
+                }
+            }
+        } else {
+            String state = stub.getStringState(datasetId);
+            if (state == null || state.isEmpty()) {
+                LOG.info("A dataset with the supplied ID does not exist in the state database");
+                throw new RuntimeException("A dataset with the supplied ID does not exist in the state database");
+            }
+            jsonArray.put(state);
         }
-        LOG.info("Successfully invoked query");
-        return ResponseUtils.newSuccessResponse("Invoke success", jsonArray.toString().getBytes(StandardCharsets.UTF_8));
+        LOG.info("Successfully retrieved metadata");
+        return jsonArray.toString();
     }
 
     /**
-     * Query state database
+     * Returns true if the identity is the rights holder of the dataset
      *
-     * @param stub Chaincode interface
-     * @param args CouchDB query string
-     * @return Response and payload (byte array of string array)
+     * @param stub     Chaincode interface
+     * @param identity Identity
+     * @param metadata Dataset metadata
+     * @return True if the identity is the rights holder
      */
-    private Response query(ChaincodeStub stub, List<String> args) {
-        JSONArray jsonArray = new JSONArray();
-        QueryResultsIterator<KeyValue> rows = stub.getQueryResult(args.get(0));
-        while (rows.iterator().hasNext()) {
-            jsonArray.put(rows.iterator().next().getStringValue());
+    private boolean isRightsHolder(ChaincodeStub stub, Identity identity, Metadata metadata) throws JsonProcessingException {
+        if (!metadata.getInstitutionId().equals(identity.getMspId())) {
+            return false;
         }
-        LOG.info("Successfully invoked query");
-        return ResponseUtils.newSuccessResponse("Invoke success", jsonArray.toString().getBytes(StandardCharsets.UTF_8));
+        String implicitCollection = IMPLICIT_ORG + identity.getMspId();
+        CompositeKey rightsKey = stub.createCompositeKey(RIGHTS_KEY, metadata.getDatasetId());
+        byte[] rightsBytes = stub.getPrivateDataHash(implicitCollection, rightsKey.toString());
+        if (rightsBytes == null || rightsBytes.length == 0) {
+            return false;
+        }
+        String invokedByHash = SHA256Hasher.getHash(JSONParser.getJSON(identity));
+        String rightsHash = Hex.encodeHexString(rightsBytes);
+        return invokedByHash.equals(rightsHash);
     }
 
     /**
-     * DatasetContract main method
+     * Returns true if the peer belongs to the specified organization.
      *
-     * @param args Arguments
+     * @param stub  Chaincode interface
+     * @param mspId MSP ID to test
+     * @return True if the peer and is from the same organization
      */
-    public static void main(String[] args) {
-        LOG.info("DatasetContract main method called");
-        new DatasetContract().start(args);
+    private boolean isPeerFromFromOrganization(ChaincodeStub stub, String mspId) {
+        String peerMspId = stub.getMspId();
+        return mspId.equals(peerMspId);
     }
 }

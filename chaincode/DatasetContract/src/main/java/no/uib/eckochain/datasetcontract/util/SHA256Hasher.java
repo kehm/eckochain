@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package main.java.no.uib.eckochain.datasetcontract.util;
 
-import java.math.BigInteger;
+import org.apache.commons.codec.binary.Hex;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -14,12 +15,7 @@ public class SHA256Hasher {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] mdBytes = md.digest(string.getBytes(StandardCharsets.UTF_8));
-            BigInteger num = new BigInteger(1, mdBytes);
-            StringBuilder hash = new StringBuilder(num.toString(16));
-            while (hash.length() < 32) {
-                hash.insert(0, "0");
-            }
-            return hash.toString();
+            return Hex.encodeHexString(mdBytes);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }

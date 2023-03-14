@@ -2,30 +2,49 @@
 # Configuration file for the Configuration Transaction Generator (configtxgen) tool
 
 Organizations:
-    - &UIB
+    - &Example
         Name: eckochain.example.com-MSP
         ID: eckochain.example.com-MSP
         MSPDir: /eckostorage/fabric_data/crypto-config/msp.eckochain.example.com
         OrdererEndpoints:
-            - "orderer0.eckochain.example.com:7050"
-            - "orderer1.eckochain.example.com:8050"
-            - "orderer2.eckochain.example.com:9050"
+            - "orderer0.orderers.eckochain.example.com:7050"
+            - "orderer1.orderers.eckochain.example.com:8050"
+            - "orderer2.orderers.eckochain.example.com:9050"
         AnchorPeers:
             - Host: peer0.eckochain.example.com
               Port: 7051
         Policies:
             Readers:
                 Type: Signature
-                Rule: "OR('eckochain.example.com-MSP.admin', 'eckochain.example.com-MSP.peer', 'eckochain.example.com-MSP.client', 'eckochain.example.com-MSP.member')"
+                Rule: "OR('eckochain.example.com-MSP.admin', 'eckochain.example.com-MSP.peer', 'eckochain.example.com-MSP.client')"
             Writers:
                 Type: Signature
-                Rule: "OR('eckochain.example.com-MSP.admin', 'eckochain.example.com-MSP.client', 'eckochain.example.com-MSP.member')"
+                Rule: "OR('eckochain.example.com-MSP.admin', 'eckochain.example.com-MSP.client')"
             Admins:
                 Type: Signature
-                Rule: "OR('eckochain.example.com-MSP.admin', 'eckochain.example.com-MSP.member')"
+                Rule: "OR('eckochain.example.com-MSP.admin')"
             Endorsement:
                 Type: Signature
-                Rule: "OR('eckochain.example.com-MSP.peer', 'eckochain.example.com-MSP.member')"
+                Rule: "OR('eckochain.example.com-MSP.peer')"
+
+    - &OrderersExample
+        Name: orderers.eckochain.example.com-MSP
+        ID: orderers.eckochain.example.com-MSP
+        MSPDir: /eckostorage/fabric_data/crypto-config/msp.orderers.eckochain.example.com
+        OrdererEndpoints:
+            - "orderer0.orderers.eckochain.example.com:7050"
+            - "orderer1.orderers.eckochain.example.com:8050"
+            - "orderer2.orderers.eckochain.example.com:9050"
+        Policies:
+            Readers:
+                Type: Signature
+                Rule: "OR('orderers.eckochain.example.com-MSP.member')"
+            Writers:
+                Type: Signature
+                Rule: "OR('orderers.eckochain.example.com-MSP.member')"
+            Admins:
+                Type: Signature
+                Rule: "OR('orderers.eckochain.example.com-MSP.admin')"
 
 Capabilities:
     Channel: &ChannelCapabilities
@@ -58,25 +77,24 @@ Orderer: &OrdererDefaults
     OrdererType: etcdraft
     EtcdRaft:
         Consenters:
-        - Host: orderer0.eckochain.example.com
+        - Host: orderer0.orderers.eckochain.example.com
           Port: 7050
-          ClientTLSCert: /eckostorage/fabric_data/crypto-config/orderer0.eckochain.example.com/enca/tls/orderer0.eckochain.example.com-tlscert.crt
-          ServerTLSCert: /eckostorage/fabric_data/crypto-config/orderer0.eckochain.example.com/enca/tls/orderer0.eckochain.example.com-tlscert.crt
-        - Host: orderer1.eckochain.example.com
+          ClientTLSCert: /eckostorage/fabric_data/crypto-config/orderer0.orderers.eckochain.example.com/enca/tls/orderer0.orderers.eckochain.example.com-tlscert.crt
+          ServerTLSCert: /eckostorage/fabric_data/crypto-config/orderer0.orderers.eckochain.example.com/enca/tls/orderer0.orderers.eckochain.example.com-tlscert.crt
+        - Host: orderer1.orderers.eckochain.example.com
           Port: 7050
-          ClientTLSCert: /eckostorage/fabric_data/crypto-config/orderer1.eckochain.example.com/enca/tls/orderer1.eckochain.example.com-tlscert.crt
-          ServerTLSCert: /eckostorage/fabric_data/crypto-config/orderer1.eckochain.example.com/enca/tls/orderer1.eckochain.example.com-tlscert.crt
-        - Host: orderer2.eckochain.example.com
+          ClientTLSCert: /eckostorage/fabric_data/crypto-config/orderer1.orderers.eckochain.example.com/enca/tls/orderer1.orderers.eckochain.example.com-tlscert.crt
+          ServerTLSCert: /eckostorage/fabric_data/crypto-config/orderer1.orderers.eckochain.example.com/enca/tls/orderer1.orderers.eckochain.example.com-tlscert.crt
+        - Host: orderer2.orderers.eckochain.example.com
           Port: 7050
-          ClientTLSCert: /eckostorage/fabric_data/crypto-config/orderer2.eckochain.example.com/enca/tls/orderer2.eckochain.example.com-tlscert.crt
-          ServerTLSCert: /eckostorage/fabric_data/crypto-config/orderer2.eckochain.example.com/enca/tls/orderer2.eckochain.example.com-tlscert.crt
+          ClientTLSCert: /eckostorage/fabric_data/crypto-config/orderer2.orderers.eckochain.example.com/enca/tls/orderer2.orderers.eckochain.example.com-tlscert.crt
+          ServerTLSCert: /eckostorage/fabric_data/crypto-config/orderer2.orderers.eckochain.example.com/enca/tls/orderer2.orderers.eckochain.example.com-tlscert.crt
     BatchTimeout: 2s
     BatchSize:
         MaxMessageCount: 1
         AbsoluteMaxBytes: 99 MB
         PreferredMaxBytes: 512 KB
     Organizations:
-        - *UIB
     Capabilities:
         <<: *OrdererCapabilities
     Policies:
@@ -115,12 +133,12 @@ Profiles:
         Orderer:
             <<: *OrdererDefaults
             Organizations:
-                - *UIB
+                - *OrderersExample
             Capabilities:
                 <<: *OrdererCapabilities
         Application:
             <<: *ApplicationDefaults
             Organizations:
-                - *UIB
+                - *Example
             Capabilities:
                 <<: *ApplicationCapabilities

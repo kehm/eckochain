@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: Apache-2.0
+# Docker configuration for Fabric CA container
+
+version: '3'
+
+networks:
+  ecko:
+    external:
+      name: ecko-network
+    
+services:
+  ca.orderers.eckochain.example.com:
+    container_name: ca.orderers.eckochain.example.com
+    image: hyperledger/fabric-ca:1.5
+    environment:
+      - FABRIC_CA_SERVER_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca.orderers.eckochain.example.com
+      - FABRIC_CA_SERVER_DEBUG=false
+      - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server/tls/ca.orderers.eckochain.example.com-tlscert.crt
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server/tls/ca.orderers.eckochain.example.com-priv.key
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_TLS_CLIENTAUTH_TYPE=VerifyClientCertIfGiven
+      - FABRIC_CA_SERVER_TLS_CLIENTAUTH_CERTFILES=/etc/hyperledger/fabric-ca-server/msp/tlscacerts/tlsca.orderers.eckochain.example.com-cert.crt
+    command: sh -c 'fabric-ca-server start -d'
+    restart: unless-stopped
+    volumes:
+      - /eckostorage/fabric_data/crypto-config/ca.orderers.eckochain.example.com/enca:/etc/hyperledger/fabric-ca-server
+    ports:
+      - 9054:7054
+    networks:
+      - ecko
+    logging:
+        driver: local
